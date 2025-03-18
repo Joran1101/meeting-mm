@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  # 后端服务
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: backend-dev
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend:/app/backend
+      - ./whisper:/app/whisper
+    environment:
+      - PORT=8080
+      - ENV=development
+      - WHISPER_MODEL_PATH=/app/whisper/models/ggml-base.bin
+      - USE_LOCAL_WHISPER=true
+    env_file:
+      - ./backend/.env
+    depends_on:
+      - whisper-download
+
+  # 前端服务
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: frontend-dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app/frontend
+      - /app/frontend/node_modules
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_URL=http://localhost:8080/api
+    stdin_open: true
+    tty: true
+
+  # Whisper模型下载服务
+  whisper-download:
+    image: alpine:3.16
+    volumes:
+      - ./whisper:/app/whisper
+    command: >
+      sh -c "
+        mkdir -p /app/whisper/models &&
+        if [ ! -f /app/whisper/models/ggml-base.bin ]; then
+          apk add --no-cache curl &&
+          echo '下载Whisper模型...' &&
+          curl -L -o /app/whisper/models/ggml-base.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin &&
+          echo '模型下载完成'
+        else
+          echo 'Whisper模型已存在，跳过下载'
+        fi
+      " 

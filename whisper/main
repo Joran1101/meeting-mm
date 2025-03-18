@@ -1,0 +1,65 @@
+#!/bin/bash
+
+# 获取参数
+MODEL_PATH=""
+INPUT_FILE=""
+OUTPUT_FORMAT=""
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -m)
+      MODEL_PATH="$2"
+      shift 2
+      ;;
+    -f)
+      INPUT_FILE="$2"
+      shift 2
+      ;;
+    -otxt)
+      OUTPUT_FORMAT="txt"
+      shift
+      ;;
+    *)
+      echo "未知参数: $1" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# 检查必要参数
+if [ -z "$INPUT_FILE" ]; then
+  echo "错误: 未指定输入文件 (-f)" >&2
+  exit 1
+fi
+
+# 获取当前脚本所在目录
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+# 明确指定使用Anaconda环境中的Python
+PYTHON_CMD="/Users/xujiawei/anaconda3/bin/python"
+
+# 如果指定的Python不存在，尝试使用其他Python
+if [ ! -f "$PYTHON_CMD" ]; then
+  PYTHON_CMD=$(which python3 || which python || echo "python")
+  echo "警告: 使用备选Python: $PYTHON_CMD" >&2
+fi
+
+# 调用Python Whisper转录
+echo "使用Python解释器: $PYTHON_CMD" >&2
+RESULT=$($PYTHON_CMD "$SCRIPT_DIR/whisper_test.py" "$INPUT_FILE" --model base)
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -ne 0 ]; then
+  echo "Whisper转录失败，退出码: $EXIT_CODE" >&2
+  exit $EXIT_CODE
+fi
+
+# 如果需要输出到文本文件
+if [ "$OUTPUT_FORMAT" = "txt" ]; then
+  echo "$RESULT" > "${INPUT_FILE}.txt"
+fi
+
+# 同时输出到标准输出
+echo "$RESULT"
+
+exit 0
