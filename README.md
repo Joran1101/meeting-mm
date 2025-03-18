@@ -1,19 +1,20 @@
 # 会议纪要自动生成器
 
-一个使用DeepSeek V3和Whisper进行会议纪要自动生成的工具，可以从会议录音中提取行动项和决策点。
+一个使用DeepSeek和Whisper进行会议纪要自动生成的工具，可以从会议录音中提取行动项和决策点。
 
 ## 功能特点
 
 - 🎙️ 会议录音转文字（使用Whisper）
-- 🤖 使用DeepSeek V3提取行动项和决策点
+- 🤖 使用DeepSeek提取行动项和决策点
 - 📝 生成结构化的会议纪要
 - 📊 支持与Notion集成
+- 📱 响应式Web界面，支持多种设备
 
 ## 技术栈
 
-- **后端**: Go + Gin
-- **前端**: React + TypeScript
-- **AI模型**: DeepSeek V3 + Whisper
+- **后端**: Go + Fiber
+- **前端**: React + TypeScript + Material-UI
+- **AI模型**: DeepSeek Chat + Whisper
 - **数据存储**: Notion API (可选)
 
 ## 开发环境要求
@@ -21,9 +22,20 @@
 - Go 1.18+
 - Node.js 16+
 - npm 8+
+- Python 3.8+ (用于Whisper)
 - DeepSeek API密钥
 - Notion API密钥 (可选)
-- Whisper模型 (可选，支持本地运行)
+- Whisper模型 (本地运行)
+
+## 项目当前状态
+
+- ✅ 音频上传和转录功能
+- ✅ 会议内容分析（摘要、待办事项、决策点）
+- ✅ Markdown格式报告生成
+- ✅ Notion集成基础功能
+- ⏳ 音频文件持久化存储
+- ⏳ 历史会议记录管理
+- ⏳ UI/UX优化
 
 ## 快速开始
 
@@ -50,6 +62,10 @@ go mod download
 # 前端
 cd ../frontend
 npm install
+
+# Whisper设置
+cd ../whisper
+pip install -r requirements.txt
 ```
 
 ### 运行
@@ -57,6 +73,8 @@ npm install
 1. 启动后端服务
 ```bash
 cd backend
+./meeting-mm-server
+# 或者从源码运行
 go run main.go
 ```
 
@@ -70,6 +88,30 @@ npm start
 ```
 http://localhost:3000
 ```
+
+## Notion集成设置
+
+要启用Notion集成，请按照以下步骤操作：
+
+1. 访问 [Notion Integrations](https://www.notion.so/my-integrations) 创建一个新的集成
+2. 获取API密钥并添加到 `backend/.env` 文件
+3. 在Notion中创建一个新数据库，包含以下属性：
+   - Name (标题类型)
+   - Date (日期类型)
+   - Summary (文本类型)
+4. 从数据库URL获取数据库ID (格式为: `https://www.notion.so/[用户名]/[数据库ID]?v=...`)
+5. 将数据库ID添加到 `backend/.env` 文件
+6. 将你创建的集成与数据库共享，授予"可以编辑"权限
+
+## 音频文件管理
+
+当前版本中，音频文件处理流程如下：
+
+1. 上传的音频文件被临时存储在系统临时目录 (`meeting-mm-whisper/`)
+2. 文件使用随机UUID命名，扩展名为 `.mp3`
+3. 转录完成后文件会被自动删除
+
+音频文件管理将在后续版本中优化，添加持久化存储选项。
 
 ## 测试
 
@@ -119,9 +161,14 @@ meeting-mm/
 │       ├── services/    # API服务
 │       ├── models/      # 数据模型
 │       └── utils/       # 工具函数
-└── whisper/             # Whisper模型和配置
-    └── models/          # 预训练模型存放目录
+├── whisper/             # Whisper模型和配置
+│   └── models/          # 预训练模型存放目录
+└── logs/                # 服务器日志和开发记录
 ```
+
+## 开发日志
+
+开发日志存放在 `logs/` 目录下，记录了每日的开发进度和问题修复情况。
 
 ## 贡献
 
