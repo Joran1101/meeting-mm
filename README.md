@@ -43,7 +43,7 @@
 
 1. 克隆仓库
 ```bash
-git clone https://github.com/yourusername/meeting-mm.git
+git clone https://github.com/Joran1101/meeting-mm.git
 cd meeting-mm
 ```
 
@@ -172,7 +172,13 @@ meeting-mm/
 
 ## 贡献
 
-欢迎提交问题和拉取请求！
+欢迎提交问题和拉取请求！请访问 [GitHub仓库](https://github.com/Joran1101/meeting-mm) 参与项目开发。
+
+## 联系方式
+
+如有问题或建议，请通过以下方式联系我：
+- GitHub: [@Joran1101](https://github.com/Joran1101)
+- 邮箱: joran1101@163.com
 
 ## 许可证
 
