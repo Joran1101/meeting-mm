@@ -113,3 +113,115 @@ body.properties.xxxxx should be defined
 - 服务器日志
 - Notion数据库的截图（显示字段类型）
 - 与Notion API的完整错误响应 
+
+# Notion集成故障排除指南
+
+本文档提供了与Notion API集成过程中可能遇到的常见问题及其解决方案。
+
+## 配置问题
+
+### API密钥无效
+
+**症状**：
+- 同步到Notion时出现401未授权错误
+- 服务器日志显示"Invalid API key"
+
+**解决方案**：
+1. 确保在`.env`文件中正确设置了`NOTION_API_KEY`
+2. 验证API密钥是否有效（在Notion的"我的集成"页面检查）
+3. 确保API密钥格式正确，通常以`secret_`开头
+
+### 数据库ID无效
+
+**症状**：
+- 同步到Notion时出现404未找到错误
+- 服务器日志显示"Invalid database ID"
+
+**解决方案**：
+1. 确保在`.env`文件中正确设置了`NOTION_DATABASE_ID`
+2. 验证数据库ID是否正确（在Notion页面URL或共享链接中查找）
+3. 确保已将集成添加到数据库的"连接"中
+
+## API请求问题
+
+### 日期格式验证错误
+
+**症状**：
+- 同步到Notion时出现422验证错误
+- 错误消息包含`body.properties.Date`相关的验证失败信息
+- 错误指出日期应该是对象或null，而不是字符串
+
+**解决方案**：
+1. 确保日期格式符合Notion API要求的ISO 8601标准
+2. 正确的日期格式应为对象结构：
+   ```json
+   "date": {
+     "start": "2022-02-14",
+     "end": null
+   }
+   ```
+3. 在代码中使用`map[string]interface{}`而非`map[string]string`来构建日期属性
+4. 确保在请求头中设置了最新的`Notion-Version`（如：`2022-06-28`）
+
+### 数据库字段不匹配
+
+**症状**：
+- 同步到Notion时出现属性不存在的错误
+- 错误消息指出特定属性在数据库中找不到
+
+**解决方案**：
+1. 首先查询数据库结构，了解可用字段：
+   ```go
+   queryURL := fmt.Sprintf("https://api.notion.com/v1/databases/%s", databaseID)
+   req, err := http.NewRequest("GET", queryURL, nil)
+   // 设置请求头...
+   ```
+2. 检查字段名是否完全匹配（Notion区分大小写）
+3. 确保属性类型正确（日期字段应使用date类型，文本字段应使用title或rich_text等）
+4. 考虑添加自动字段名称映射功能，允许代码查找相似但不完全匹配的字段
+
+## 权限问题
+
+### 无权访问页面
+
+**症状**：
+- 同步到Notion时出现403禁止访问错误
+- 服务器日志显示"Access denied"或类似消息
+
+**解决方案**：
+1. 确保集成已被添加到目标数据库的"连接"中
+2. 验证集成权限是否包含读写目标数据库的能力
+3. 如果数据库位于工作区内，确保集成已被授权访问该工作区
+
+## 调试技巧
+
+### 启用详细日志
+
+在`services/notion.go`中添加详细的日志记录：
+
+```go
+// 请求前记录
+log.Printf("正在发送Notion请求: %s", reqBody)
+
+// 响应后记录
+log.Printf("Notion响应状态码: %d", resp.StatusCode)
+respBody, _ := ioutil.ReadAll(resp.Body)
+log.Printf("Notion响应内容: %s", string(respBody))
+```
+
+### 使用API版本兼容性
+
+始终在请求中指定Notion API版本：
+
+```go
+req.Header.Set("Notion-Version", "2022-06-28")
+```
+
+如果API有重大更新，可能需要更新此值。
+
+### 验证API结构
+
+使用Notion API参考文档验证您的请求结构：
+https://developers.notion.com/reference
+
+特别注意每种属性类型的特定格式要求。 
