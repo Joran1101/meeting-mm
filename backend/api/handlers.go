@@ -175,9 +175,9 @@ func (h *Handler) StreamAudio(c *fiber.Ctx) error {
 	})
 }
 
-// AnalyzeTranscript 分析转录内容
+// AnalyzeTranscript 分析会议转录并生成会议纪要
 func (h *Handler) AnalyzeTranscript(c *fiber.Ctx) error {
-	// 解析请求体
+	// 解析请求
 	var request struct {
 		Title      string `json:"title"`
 		Transcript string `json:"transcript"`
@@ -189,33 +189,40 @@ func (h *Handler) AnalyzeTranscript(c *fiber.Ctx) error {
 		})
 	}
 
-	if request.Title == "" {
+	title := request.Title
+	transcript := request.Transcript
+
+	if title == "" {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 			"error": "会议标题不能为空",
 		})
 	}
 
-	if request.Transcript == "" {
+	if transcript == "" {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": "转录内容不能为空",
+			"error": "会议转录不能为空",
 		})
 	}
 
 	// 分析转录内容
-	summary, todoItems, decisions, err := h.deepseekService.AnalyzeTranscript(request.Title, request.Transcript)
+	summary, todoItems, decisions, err := h.deepseekService.AnalyzeTranscript(title, transcript)
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": fmt.Sprintf("分析转录内容失败: %v", err),
 		})
 	}
 
+	// 格式化当前日期为标准格式 (2006-01-02)
+	currentDate := time.Now().Format("2006-01-02")
+	fmt.Printf("使用的会议日期: %s\n", currentDate)
+
 	// 创建会议对象
 	meeting := services.Meeting{
 		ID:           uuid.New().String(),
-		Title:        request.Title,
-		Date:         time.Now().Format("2006-01-02"),
+		Title:        title,
+		Date:         currentDate,
 		Participants: []string{}, // 这里可以从请求中获取参与者信息
-		Transcript:   request.Transcript,
+		Transcript:   transcript,
 		Summary:      summary,
 		TodoItems:    todoItems,
 		Decisions:    decisions,
@@ -250,6 +257,15 @@ func (h *Handler) SyncToNotion(c *fiber.Ctx) error {
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 			"error": fmt.Sprintf("解析请求体失败: %v", err),
 		})
+	}
+
+	// 记录接收到的请求数据
+	fmt.Printf("接收到的会议数据：%+v\n", request.Meeting)
+
+	// 如果日期为空，使用当前日期
+	if request.Meeting.Date == "" {
+		request.Meeting.Date = time.Now().Format("2006-01-02")
+		fmt.Printf("日期为空，已设置为当前日期: %s\n", request.Meeting.Date)
 	}
 
 	// 同步到Notion
