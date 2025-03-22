@@ -39,4 +39,23 @@ coverage/
 
 # 临时文件
 tmp/
-temp/ 
+temp/
+
+# 日志文件
+backend/backend_log.txt
+**/logs/
+*.log
+
+# 临时文件
+*.tmp
+*~
+*.bak
+
+# 测试相关的临时文件
+*/tmp/
+tmp/
+
+# 本地开发文件
+simple_handle_test.sh
+test_*.sh
+!test/scripts/*.sh 
