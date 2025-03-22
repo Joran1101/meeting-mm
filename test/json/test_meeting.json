@@ -1,0 +1,21 @@
+{
+  "meeting": {
+    "id": "test-123",
+    "title": "测试会议 - Notion同步测试",
+    "date": "2025-03-23",
+    "participants": ["测试用户"],
+    "transcript": "这是一个测试转录文本，用于测试Notion同步功能是否正常工作。",
+    "summary": "这是一个测试摘要，验证重新配置的Notion数据库集成是否成功。",
+    "todoItems": [
+      {"description": "检查Notion同步是否成功", "completed": false},
+      {"description": "验证日期格式是否正确", "completed": false}
+    ],
+    "decisions": [
+      {"description": "决定使用新的数据库结构", "rationale": "为了提高系统兼容性"},
+      {"description": "继续优化系统", "rationale": "提升用户体验"}
+    ],
+    "createdAt": "2025-03-22T16:09:22Z",
+    "updatedAt": "2025-03-22T16:09:22Z"
+  },
+  "markdownReport": "# 测试会议 - Notion同步测试\n\n日期: 2025-03-23\n\n## 摘要\n\n这是一个测试摘要，验证重新配置的Notion数据库集成是否成功。\n\n## 待办事项\n\n- 检查Notion同步是否成功\n- 验证日期格式是否正确\n\n## 决策\n\n- 决定使用新的数据库结构\n- 继续优化系统\n\n## 会议详情\n\n这是一个测试转录文本，用于测试Notion同步功能是否正常工作。"
+}
