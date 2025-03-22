@@ -245,8 +245,8 @@ func (h *Handler) AnalyzeTranscript(c *fiber.Ctx) error {
 	})
 }
 
-// SyncToNotion 同步到Notion
-func (h *Handler) SyncToNotion(c *fiber.Ctx) error {
+// SyncToNotionHandler 处理将会议数据同步到Notion
+func (h *Handler) SyncToNotionHandler(c *fiber.Ctx) error {
 	// 解析请求体
 	var request struct {
 		Meeting        services.Meeting `json:"meeting"`
@@ -254,6 +254,7 @@ func (h *Handler) SyncToNotion(c *fiber.Ctx) error {
 	}
 
 	if err := c.BodyParser(&request); err != nil {
+		fmt.Printf("解析请求体失败: %v\n", err)
 		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
 			"error": fmt.Sprintf("解析请求体失败: %v", err),
 		})
@@ -268,13 +269,16 @@ func (h *Handler) SyncToNotion(c *fiber.Ctx) error {
 		fmt.Printf("日期为空，已设置为当前日期: %s\n", request.Meeting.Date)
 	}
 
-	// 同步到Notion
-	notionPageID, err := h.notionService.SyncToNotion(request.Meeting, request.MarkdownReport)
+	// 使用优化后的SyncViaScript方法
+	notionPageID, err := h.notionService.SyncViaScript(request.Meeting)
 	if err != nil {
+		fmt.Printf("同步到Notion失败: %v\n", err)
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": fmt.Sprintf("同步到Notion失败: %v", err),
 		})
 	}
+
+	fmt.Printf("同步成功，返回的Notion页面ID: %s\n", notionPageID)
 
 	// 返回结果
 	return c.JSON(fiber.Map{
