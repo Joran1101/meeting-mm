@@ -58,4 +58,17 @@ tmp/
 # 本地开发文件
 simple_handle_test.sh
 test_*.sh
-!test/scripts/*.sh 
+!test/scripts/*.sh
+
+# 后端二进制文件
+backend/meeting-mm
+backend/meeting-mm-server
+backend/*.exe
+backend/*.exe~
+backend/*.dll
+backend/*.so
+backend/*.dylib
+
+# 后端日志文件
+backend/backend_log.txt
+backend/*.log 

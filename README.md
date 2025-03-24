@@ -9,13 +9,16 @@
 - 📝 生成结构化的会议纪要
 - 📊 支持与Notion集成
 - 📱 响应式Web界面，支持多种设备
+- 🔄 自动同步会议记录到Notion
+- 📋 支持多种日期格式
 
 ## 技术栈
 
 - **后端**: Go + Fiber
 - **前端**: React + TypeScript + Material-UI
 - **AI模型**: DeepSeek Chat + Whisper
-- **数据存储**: Notion API (可选)
+- **数据存储**: Notion API
+- **测试**: 集成测试 + 单元测试
 
 ## 开发环境要求
 
@@ -24,7 +27,7 @@
 - npm 8+
 - Python 3.8+ (用于Whisper)
 - DeepSeek API密钥
-- Notion API密钥 (可选)
+- Notion API密钥
 - Whisper模型 (本地运行)
 
 ## 项目当前状态
@@ -33,8 +36,9 @@
 - ✅ 会议内容分析（摘要、待办事项、决策点）
 - ✅ Markdown格式报告生成
 - ✅ Notion集成基础功能
-- ⏳ 音频文件持久化存储
-- ⏳ 历史会议记录管理
+- ✅ 测试脚本和文档整理
+- ⏳ 说话人识别功能
+- ⏳ 音频段落自动划分
 - ⏳ UI/UX优化
 
 查看完整的[待办事项列表](TODO.md)了解计划中的功能和已知问题。
@@ -82,6 +86,9 @@ pip install -r requirements.txt
 
 # 停止所有服务
 ./stop.sh
+
+# 重启服务
+./restart.sh
 ```
 
 启动脚本会自动：
@@ -95,8 +102,6 @@ pip install -r requirements.txt
 1. 启动后端服务
 ```bash
 cd backend
-./meeting-mm-server
-# 或者从源码运行
 go run main.go
 ```
 
@@ -125,40 +130,40 @@ http://localhost:3000
 5. 将数据库ID添加到 `backend/.env` 文件
 6. 将你创建的集成与数据库共享，授予"可以编辑"权限
 
-如果遇到Notion集成问题，请参考[Notion集成问题排查指南](docs/notion_integration_troubleshooting.md)获取详细的故障排除步骤。
-
-## 音频文件管理
-
-当前版本中，音频文件处理流程如下：
-
-1. 上传的音频文件被临时存储在系统临时目录 (`meeting-mm-whisper/`)
-2. 文件使用随机UUID命名，扩展名为 `.mp3`
-3. 转录完成后文件会被自动删除
-
-音频文件管理将在后续版本中优化，添加持久化存储选项。
+如果遇到Notion集成问题，请参考[Notion集成问题排查指南](docs/troubleshooting/notion_integration_help.md)获取详细的故障排除步骤。
 
 ## 测试
 
 项目包含多种测试方式，确保功能正常工作。
 
-### 运行集成测试
+### 运行所有测试
 
-使用集成测试脚本可以自动测试前后端集成：
+使用统一的测试启动脚本运行所有测试：
 
 ```bash
-chmod +x test_integration.sh
-./test_integration.sh
+./run_tests.sh
 ```
 
-### 后端单元测试
+### 运行特定测试
 
+1. Notion API测试
+```bash
+./test/scripts/test_notion_connection.sh  # 测试API连接
+./test/scripts/test_notion_sync.sh  # 测试同步功能
+```
+
+2. 集成测试
+```bash
+./test/scripts/test_integration.sh
+```
+
+3. 后端单元测试
 ```bash
 cd backend
 go test ./...
 ```
 
-### 前端测试
-
+4. 前端测试
 ```bash
 cd frontend
 npm test
@@ -166,7 +171,19 @@ npm test
 
 ### API测试
 
-前端包含API测试工具，可以在浏览器中直接测试API连接、音频上传和转录分析功能。
+可以使用curl测试API：
+
+```bash
+# 测试分析API
+curl -X POST http://localhost:8080/api/meetings/analyze \
+  -H "Content-Type: application/json" \
+  -d @test/json/test_analyze.json
+
+# 测试Notion同步API
+curl -X POST http://localhost:8080/api/meetings/sync-notion \
+  -H "Content-Type: application/json" \
+  -d @test/json/test_meeting.json
+```
 
 ## 项目结构
 
@@ -188,9 +205,15 @@ meeting-mm/
 ├── whisper/             # Whisper模型和配置
 │   └── models/          # 预训练模型存放目录
 ├── docs/                # 项目文档
-├── logs/                # 服务器日志和开发记录
+│   └── troubleshooting/ # 故障排除指南
+├── logs/                # 服务器日志
+├── test/                # 测试相关文件
+│   ├── scripts/         # 测试脚本
+│   └── json/            # 测试数据
 ├── start.sh             # 一键启动脚本
-└── stop.sh              # 一键停止脚本
+├── stop.sh              # 一键停止脚本
+├── restart.sh           # 重启脚本
+└── run_tests.sh         # 测试启动脚本
 ```
 
 ## 开发日志
@@ -200,6 +223,7 @@ meeting-mm/
 - [2025年3月17日开发日志](logs/development_log_20250317.md) - 项目初始化与基础框架搭建
 - [2025年3月18日开发日志](logs/development_log_20250318.md) - 前端重构与核心功能实现
 - [2025年3月19日开发日志](logs/development_log_20250319.md) - 功能完善与bug修复
+- [2025年3月20日开发日志](logs/development_log_20250320.md) - Notion集成优化与测试完善
 
 完整的变更历史记录在 [CHANGELOG.md](CHANGELOG.md) 文件中。
 

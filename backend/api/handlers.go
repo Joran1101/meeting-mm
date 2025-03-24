@@ -285,3 +285,70 @@ func (h *Handler) SyncToNotionHandler(c *fiber.Ctx) error {
 		"notionPageId": notionPageID,
 	})
 }
+
+// SyncToNotion 同步会议数据到Notion
+func (h *Handler) SyncToNotion(c *fiber.Ctx) error {
+	var request struct {
+		ID           string   `json:"id"`
+		Title        string   `json:"title"`
+		Date         string   `json:"date"`
+		Participants []string `json:"participants"`
+		Transcript   string   `json:"transcript"`
+		Summary      string   `json:"summary"`
+		TodoItems    []struct {
+			Description string `json:"description"`
+		} `json:"todo_items"`
+		Decisions []struct {
+			Description string `json:"description"`
+		} `json:"decisions"`
+		CreatedAt string `json:"created_at"`
+		UpdatedAt string `json:"updated_at"`
+	}
+
+	if err := c.BodyParser(&request); err != nil {
+		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+			"error": "无法解析请求数据",
+		})
+	}
+
+	// 构建会议对象
+	meeting := services.Meeting{
+		ID:           request.ID,
+		Title:        request.Title,
+		Date:         request.Date,
+		Participants: request.Participants,
+		Transcript:   request.Transcript,
+		Summary:      request.Summary,
+		TodoItems:    make([]services.TodoItem, len(request.TodoItems)),
+		Decisions:    make([]services.Decision, len(request.Decisions)),
+		CreatedAt:    request.CreatedAt,
+		UpdatedAt:    request.UpdatedAt,
+	}
+
+	// 转换待办事项
+	for i, todo := range request.TodoItems {
+		meeting.TodoItems[i] = services.TodoItem{
+			Description: todo.Description,
+		}
+	}
+
+	// 转换决策
+	for i, decision := range request.Decisions {
+		meeting.Decisions[i] = services.Decision{
+			Description: decision.Description,
+		}
+	}
+
+	// 同步到Notion
+	notionPageID, err := h.notionService.SyncToNotion(meeting, "")
+	if err != nil {
+		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+			"error": fmt.Sprintf("同步到Notion失败: %v", err),
+		})
+	}
+
+	return c.JSON(fiber.Map{
+		"message": "成功同步到Notion",
+		"page_id": notionPageID,
+	})
+}

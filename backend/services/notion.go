@@ -238,20 +238,16 @@ func SyncToNotion(meetingTitle string, meetingDate time.Time, meetingSummary str
 
 // SyncToNotion 是NotionService的方法，用于同步会议数据到Notion
 func (s *NotionService) SyncToNotion(meeting Meeting, markdownReport string) (string, error) {
-	// 打印原始日期值
-	fmt.Printf("原始会议日期: '%s' (类型: %T)\n", meeting.Date, meeting.Date)
-
 	// 解析日期
-	parsedTime, err := time.Parse("2006-01-02", meeting.Date)
-	if err != nil {
-		fmt.Printf("解析日期失败: %v，尝试其他格式\n", err)
-
-		// 尝试其他常见格式
+	parsedTime := time.Now()
+	var err error
+	if meeting.Date != "" {
+		// 尝试多种日期格式
 		formats := []string{
-			time.RFC3339,
+			"2006-01-02",
 			"2006/01/02",
-			"2006-01-02T15:04:05Z",
 			"2006年01月02日",
+			time.RFC3339,
 		}
 
 		parsed := false
@@ -282,10 +278,6 @@ func (s *NotionService) SyncToNotion(meeting Meeting, markdownReport string) (st
 		decisions = append(decisions, decision.Description)
 	}
 
-	// 输出将用于Notion的日期格式
-	formattedDate := parsedTime.Format("2006-01-02")
-	fmt.Printf("原始格式化日期: %s\n", formattedDate)
-
 	// 构建待办事项和决策文本
 	todos_text := ""
 	if len(todos) > 0 {
@@ -312,44 +304,50 @@ func (s *NotionService) SyncToNotion(meeting Meeting, markdownReport string) (st
 		full_content += "\n\n" + decisions_text
 	}
 
-	// 创建请求体 - 使用与成功脚本完全一致的格式
-	requestBodyStr := fmt.Sprintf(`{
-		"parent": {
-			"database_id": "%s"
+	// 构建请求体
+	requestBody := map[string]interface{}{
+		"parent": map[string]interface{}{
+			"database_id": s.databaseID,
 		},
-		"properties": {
-			"Name": {
-				"title": [
+		"properties": map[string]interface{}{
+			"Name": map[string]interface{}{
+				"title": []map[string]interface{}{
 					{
-						"text": {
-							"content": "%s"
-						}
-					}
-				]
+						"text": map[string]interface{}{
+							"content": meeting.Title,
+						},
+					},
+				},
 			},
-			"Date": {
-				"date": {
-					"start": "%s"
-				}
+			"Date": map[string]interface{}{
+				"date": map[string]interface{}{
+					"start": parsedTime.Format("2006-01-02"),
+				},
 			},
-			"Summary": {
-				"rich_text": [
+			"Summary": map[string]interface{}{
+				"rich_text": []map[string]interface{}{
 					{
-						"text": {
-							"content": "%s"
-						}
-					}
-				]
-			}
-		}
-	}`, s.databaseID, meeting.Title, formattedDate, full_content)
+						"text": map[string]interface{}{
+							"content": full_content,
+						},
+					},
+				},
+			},
+		},
+	}
 
-	fmt.Printf("发送到Notion的请求体: %s\n", requestBodyStr)
+	// 将请求体转换为JSON字符串
+	requestBodyStr, err := json.Marshal(requestBody)
+	if err != nil {
+		return "", fmt.Errorf("构建请求体失败: %v", err)
+	}
+
+	fmt.Printf("发送到Notion的请求体: %s\n", string(requestBodyStr))
 
 	// 创建请求
-	req, err := http.NewRequest("POST", "https://api.notion.com/v1/pages", strings.NewReader(requestBodyStr))
+	req, err := http.NewRequest("POST", "https://api.notion.com/v1/pages", bytes.NewBuffer(requestBodyStr))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("创建请求失败: %v", err)
 	}
 
 	// 设置请求头
@@ -360,31 +358,26 @@ func (s *NotionService) SyncToNotion(meeting Meeting, markdownReport string) (st
 	// 发送请求
 	resp, err := s.client.Do(req)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("发送请求失败: %v", err)
 	}
 	defer resp.Body.Close()
 
 	// 读取响应
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("读取响应失败: %v", err)
 	}
 
 	// 检查响应状态
 	if resp.StatusCode != 200 {
-		// 输出更详细的错误信息
 		fmt.Printf("API请求失败，状态码：%d，响应：%s\n", resp.StatusCode, string(body))
 
-		// 尝试解析错误消息并提供更多上下文
+		// 尝试解析错误消息
 		var errorResponse map[string]interface{}
 		if err := json.Unmarshal(body, &errorResponse); err == nil {
 			if errMsg, ok := errorResponse["message"].(string); ok {
 				fmt.Printf("错误消息: %s\n", errMsg)
-
-				// 检查是否是日期格式问题
-				if strings.Contains(errMsg, "date should be an object") {
-					fmt.Printf("这可能是一个日期格式问题。使用的日期值: %s\n", formattedDate)
-				}
+				return "", fmt.Errorf("API请求失败: %s", errMsg)
 			}
 		}
 
