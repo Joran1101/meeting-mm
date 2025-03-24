@@ -132,6 +132,29 @@ http://localhost:3000
 
 如果遇到Notion集成问题，请参考[Notion集成问题排查指南](docs/troubleshooting/notion_integration_help.md)获取详细的故障排除步骤。
 
+### 测试Notion集成
+
+完成设置后，可以通过以下方式测试Notion集成是否正常工作：
+
+1. 使用预置的测试数据
+```bash
+# 使用测试脚本
+./test/scripts/test_notion_sync.sh
+
+# 或者使用curl命令
+curl -X POST http://localhost:8080/api/meetings/sync-notion \
+  -H "Content-Type: application/json" \
+  -d @test/json/test_meeting.json
+```
+
+2. 通过Web界面测试
+   - 打开应用并录制一段会议音频
+   - 或者上传会议记录并分析
+   - 点击"同步到Notion"按钮
+   - 检查Notion数据库中是否出现了新的条目
+
+如果同步过程中遇到问题，请检查应用日志以获取详细的错误信息。常见问题的解决方案可以在[Notion集成问题排查指南](docs/troubleshooting/notion_integration_help.md)中找到。
+
 ## 测试
 
 项目包含多种测试方式，确保功能正常工作。
@@ -224,6 +247,7 @@ meeting-mm/
 - [2025年3月18日开发日志](logs/development_log_20250318.md) - 前端重构与核心功能实现
 - [2025年3月19日开发日志](logs/development_log_20250319.md) - 功能完善与bug修复
 - [2025年3月20日开发日志](logs/development_log_20250320.md) - Notion集成优化与测试完善
+- [2025年3月25日开发日志](logs/development_log_20250325.md) - 修复Notion同步问题与路由配置错误
 
 完整的变更历史记录在 [CHANGELOG.md](CHANGELOG.md) 文件中。
 

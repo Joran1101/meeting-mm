@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"meeting-mm/models"
 	"meeting-mm/services"
 
 	"github.com/gofiber/fiber/v2"
@@ -92,21 +94,56 @@ func (h *Handler) UploadAudio(c *fiber.Ctx) error {
 	}
 
 	// 创建会议对象
-	meeting := services.Meeting{
+	meeting := &models.Meeting{
 		ID:           uuid.New().String(),
 		Title:        title,
-		Date:         time.Now().Format("2006-01-02"),
+		Date:         time.Now(),
 		Participants: []string{}, // 这里可以从请求中获取参与者信息
 		Transcript:   transcript,
 		Summary:      summary,
-		TodoItems:    todoItems,
-		Decisions:    decisions,
-		CreatedAt:    time.Now().Format(time.RFC3339),
-		UpdatedAt:    time.Now().Format(time.RFC3339),
+		TodoItems:    make([]models.TodoItem, len(todoItems)),
+		Decisions:    make([]models.Decision, len(decisions)),
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+
+	// 转换待办事项
+	for i, todo := range todoItems {
+		dueDate, err := time.Parse("2006-01-02", todo.DueDate)
+		if err != nil {
+			dueDate = time.Time{} // 如果解析失败，使用零值
+		}
+		meeting.TodoItems[i] = models.TodoItem{
+			ID:          todo.ID,
+			Description: todo.Description,
+			Assignee:    todo.Assignee,
+			DueDate:     dueDate,
+			Status:      todo.Status,
+		}
+	}
+
+	// 转换决策点
+	for i, decision := range decisions {
+		meeting.Decisions[i] = models.Decision{
+			ID:          decision.ID,
+			Description: decision.Description,
+			MadeBy:      decision.MadeBy,
+		}
 	}
 
 	// 生成Markdown报告
-	markdownReport, err := h.deepseekService.GenerateMarkdownReport(meeting)
+	markdownReport, err := h.deepseekService.GenerateMarkdownReport(services.Meeting{
+		ID:           meeting.ID,
+		Title:        meeting.Title,
+		Date:         meeting.Date.Format("2006-01-02"),
+		Participants: meeting.Participants,
+		Transcript:   meeting.Transcript,
+		Summary:      meeting.Summary,
+		TodoItems:    todoItems,
+		Decisions:    decisions,
+		CreatedAt:    meeting.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:    meeting.UpdatedAt.Format(time.RFC3339),
+	})
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": fmt.Sprintf("生成Markdown报告失败: %v", err),
@@ -115,12 +152,10 @@ func (h *Handler) UploadAudio(c *fiber.Ctx) error {
 
 	// 同步到Notion（如果需要）
 	if syncToNotion {
-		notionPageID, err := h.notionService.SyncToNotion(meeting, markdownReport)
+		err := h.notionService.SyncMeeting(meeting)
 		if err != nil {
 			// 不中断流程，只记录错误
 			fmt.Printf("同步到Notion失败: %v\n", err)
-		} else {
-			meeting.NotionPageID = notionPageID
 		}
 	}
 
@@ -212,26 +247,57 @@ func (h *Handler) AnalyzeTranscript(c *fiber.Ctx) error {
 		})
 	}
 
-	// 格式化当前日期为标准格式 (2006-01-02)
-	currentDate := time.Now().Format("2006-01-02")
-	fmt.Printf("使用的会议日期: %s\n", currentDate)
-
 	// 创建会议对象
-	meeting := services.Meeting{
+	meeting := &models.Meeting{
 		ID:           uuid.New().String(),
 		Title:        title,
-		Date:         currentDate,
+		Date:         time.Now(),
 		Participants: []string{}, // 这里可以从请求中获取参与者信息
 		Transcript:   transcript,
 		Summary:      summary,
-		TodoItems:    todoItems,
-		Decisions:    decisions,
-		CreatedAt:    time.Now().Format(time.RFC3339),
-		UpdatedAt:    time.Now().Format(time.RFC3339),
+		TodoItems:    make([]models.TodoItem, len(todoItems)),
+		Decisions:    make([]models.Decision, len(decisions)),
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+
+	// 转换待办事项
+	for i, todo := range todoItems {
+		dueDate, err := time.Parse("2006-01-02", todo.DueDate)
+		if err != nil {
+			dueDate = time.Time{} // 如果解析失败，使用零值
+		}
+		meeting.TodoItems[i] = models.TodoItem{
+			ID:          todo.ID,
+			Description: todo.Description,
+			Assignee:    todo.Assignee,
+			DueDate:     dueDate,
+			Status:      todo.Status,
+		}
+	}
+
+	// 转换决策点
+	for i, decision := range decisions {
+		meeting.Decisions[i] = models.Decision{
+			ID:          decision.ID,
+			Description: decision.Description,
+			MadeBy:      decision.MadeBy,
+		}
 	}
 
 	// 生成Markdown报告
-	markdownReport, err := h.deepseekService.GenerateMarkdownReport(meeting)
+	markdownReport, err := h.deepseekService.GenerateMarkdownReport(services.Meeting{
+		ID:           meeting.ID,
+		Title:        meeting.Title,
+		Date:         meeting.Date.Format("2006-01-02"),
+		Participants: meeting.Participants,
+		Transcript:   meeting.Transcript,
+		Summary:      meeting.Summary,
+		TodoItems:    todoItems,
+		Decisions:    decisions,
+		CreatedAt:    meeting.CreatedAt.Format(time.RFC3339),
+		UpdatedAt:    meeting.UpdatedAt.Format(time.RFC3339),
+	})
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": fmt.Sprintf("生成Markdown报告失败: %v", err),
@@ -247,30 +313,173 @@ func (h *Handler) AnalyzeTranscript(c *fiber.Ctx) error {
 
 // SyncToNotionHandler 处理将会议数据同步到Notion
 func (h *Handler) SyncToNotionHandler(c *fiber.Ctx) error {
-	// 解析请求体
+	// 打印原始请求体
+	requestBody := string(c.Body())
+	fmt.Printf("【调试】原始请求体: %s\n", requestBody)
+
 	var request struct {
-		Meeting        services.Meeting `json:"meeting"`
-		MarkdownReport string           `json:"markdownReport"`
+		Meeting        models.Meeting `json:"meeting"`
+		MarkdownReport string         `json:"markdownReport"`
 	}
 
 	if err := c.BodyParser(&request); err != nil {
-		fmt.Printf("解析请求体失败: %v\n", err)
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{
-			"error": fmt.Sprintf("解析请求体失败: %v", err),
+		// 尝试解析旧格式的请求
+		var oldRequest struct {
+			ID           string   `json:"id"`
+			Title        string   `json:"title"`
+			Date         string   `json:"date"`
+			Participants []string `json:"participants"`
+			Transcript   string   `json:"transcript"`
+			Summary      string   `json:"summary"`
+			TodoItems    []struct {
+				Description string `json:"description"`
+				Assignee    string `json:"assignee"`
+				DueDate     string `json:"dueDate"`
+				Status      string `json:"status"`
+			} `json:"todo_items"`
+			Decisions []struct {
+				Description string `json:"description"`
+				MadeBy      string `json:"madeBy"`
+			} `json:"decisions"`
+			CreatedAt string `json:"created_at"`
+			UpdatedAt string `json:"updated_at"`
+		}
+
+		if err2 := c.BodyParser(&oldRequest); err2 != nil {
+			fmt.Printf("解析请求体失败: %v\n", err)
+			return c.Status(http.StatusBadRequest).JSON(fiber.Map{
+				"error": fmt.Sprintf("解析请求体失败: %v", err),
+			})
+		}
+
+		// 将旧格式转换为新格式
+		meeting := &models.Meeting{
+			ID:           oldRequest.ID,
+			Title:        oldRequest.Title,
+			Participants: oldRequest.Participants,
+			Transcript:   oldRequest.Transcript,
+			Summary:      oldRequest.Summary,
+		}
+
+		// 解析日期
+		if oldRequest.Date != "" {
+			date, err := time.Parse("2006-01-02", oldRequest.Date)
+			if err != nil {
+				fmt.Printf("解析日期失败: %v，使用当前日期\n", err)
+				meeting.Date = time.Now()
+			} else {
+				meeting.Date = date
+			}
+		} else {
+			meeting.Date = time.Now()
+		}
+
+		// 处理待办事项
+		if len(oldRequest.TodoItems) > 0 {
+			meeting.TodoItems = make([]models.TodoItem, len(oldRequest.TodoItems))
+			for i, item := range oldRequest.TodoItems {
+				todoItem := models.TodoItem{
+					ID:          uuid.New().String(),
+					Description: item.Description,
+					Assignee:    item.Assignee,
+					Status:      item.Status,
+				}
+
+				// 解析截止日期
+				if item.DueDate != "" {
+					dueDate, err := time.Parse("2006-01-02", item.DueDate)
+					if err == nil {
+						todoItem.DueDate = dueDate
+					}
+				}
+
+				meeting.TodoItems[i] = todoItem
+			}
+		}
+
+		// 处理决策事项
+		if len(oldRequest.Decisions) > 0 {
+			meeting.Decisions = make([]models.Decision, len(oldRequest.Decisions))
+			for i, item := range oldRequest.Decisions {
+				meeting.Decisions[i] = models.Decision{
+					ID:          uuid.New().String(),
+					Description: item.Description,
+					MadeBy:      item.MadeBy,
+				}
+			}
+		}
+
+		// 解析创建和更新时间
+		if oldRequest.CreatedAt != "" {
+			createdAt, err := time.Parse(time.RFC3339, oldRequest.CreatedAt)
+			if err == nil {
+				meeting.CreatedAt = createdAt
+			} else {
+				meeting.CreatedAt = time.Now()
+			}
+		} else {
+			meeting.CreatedAt = time.Now()
+		}
+
+		if oldRequest.UpdatedAt != "" {
+			updatedAt, err := time.Parse(time.RFC3339, oldRequest.UpdatedAt)
+			if err == nil {
+				meeting.UpdatedAt = updatedAt
+			} else {
+				meeting.UpdatedAt = time.Now()
+			}
+		} else {
+			meeting.UpdatedAt = time.Now()
+		}
+
+		// 记录接收到的请求数据
+		meetingBytes, _ := json.Marshal(meeting)
+		fmt.Printf("转换后的会议数据：%s\n", string(meetingBytes))
+
+		// 同步到Notion
+		err = h.notionService.SyncMeeting(meeting)
+		if err != nil {
+			fmt.Printf("同步到Notion失败: %v\n", err)
+			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
+				"error": fmt.Sprintf("同步到Notion失败: %v", err),
+			})
+		}
+
+		return c.JSON(fiber.Map{
+			"status":       "success",
+			"notionPageId": meeting.NotionPageID,
 		})
 	}
 
+	// 新格式请求处理
+	meeting := &request.Meeting
+
 	// 记录接收到的请求数据
-	fmt.Printf("接收到的会议数据：%+v\n", request.Meeting)
+	meetingBytes, _ := json.Marshal(meeting)
+	fmt.Printf("【调试】解析后的会议数据：%s\n", string(meetingBytes))
+	fmt.Printf("【调试】会议标题：'%s'，长度：%d\n", meeting.Title, len(meeting.Title))
 
 	// 如果日期为空，使用当前日期
-	if request.Meeting.Date == "" {
-		request.Meeting.Date = time.Now().Format("2006-01-02")
-		fmt.Printf("日期为空，已设置为当前日期: %s\n", request.Meeting.Date)
+	if meeting.Date.IsZero() {
+		meeting.Date = time.Now()
+		fmt.Printf("日期为空，已设置为当前日期: %s\n", meeting.Date.Format("2006-01-02"))
 	}
 
-	// 使用优化后的SyncViaScript方法
-	notionPageID, err := h.notionService.SyncViaScript(request.Meeting)
+	// 确保待办事项和决策都有ID
+	for i, todo := range meeting.TodoItems {
+		if todo.ID == "" {
+			meeting.TodoItems[i].ID = uuid.New().String()
+		}
+	}
+
+	for i, decision := range meeting.Decisions {
+		if decision.ID == "" {
+			meeting.Decisions[i].ID = uuid.New().String()
+		}
+	}
+
+	// 同步到Notion
+	err := h.notionService.SyncMeeting(meeting)
 	if err != nil {
 		fmt.Printf("同步到Notion失败: %v\n", err)
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
@@ -278,11 +487,9 @@ func (h *Handler) SyncToNotionHandler(c *fiber.Ctx) error {
 		})
 	}
 
-	fmt.Printf("同步成功，返回的Notion页面ID: %s\n", notionPageID)
-
-	// 返回结果
 	return c.JSON(fiber.Map{
-		"notionPageId": notionPageID,
+		"status":       "success",
+		"notionPageId": meeting.NotionPageID,
 	})
 }
 
@@ -297,9 +504,13 @@ func (h *Handler) SyncToNotion(c *fiber.Ctx) error {
 		Summary      string   `json:"summary"`
 		TodoItems    []struct {
 			Description string `json:"description"`
+			Assignee    string `json:"assignee"`
+			DueDate     string `json:"dueDate"`
+			Status      string `json:"status"`
 		} `json:"todo_items"`
 		Decisions []struct {
 			Description string `json:"description"`
+			MadeBy      string `json:"madeBy"`
 		} `json:"decisions"`
 		CreatedAt string `json:"created_at"`
 		UpdatedAt string `json:"updated_at"`
@@ -311,36 +522,52 @@ func (h *Handler) SyncToNotion(c *fiber.Ctx) error {
 		})
 	}
 
+	// 解析日期
+	date, err := time.Parse("2006-01-02", request.Date)
+	if err != nil {
+		date = time.Now() // 如果解析失败，使用当前时间
+	}
+
 	// 构建会议对象
-	meeting := services.Meeting{
+	meeting := &models.Meeting{
 		ID:           request.ID,
 		Title:        request.Title,
-		Date:         request.Date,
+		Date:         date,
 		Participants: request.Participants,
 		Transcript:   request.Transcript,
 		Summary:      request.Summary,
-		TodoItems:    make([]services.TodoItem, len(request.TodoItems)),
-		Decisions:    make([]services.Decision, len(request.Decisions)),
-		CreatedAt:    request.CreatedAt,
-		UpdatedAt:    request.UpdatedAt,
+		TodoItems:    make([]models.TodoItem, len(request.TodoItems)),
+		Decisions:    make([]models.Decision, len(request.Decisions)),
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 
 	// 转换待办事项
-	for i, todo := range request.TodoItems {
-		meeting.TodoItems[i] = services.TodoItem{
-			Description: todo.Description,
+	for i, item := range request.TodoItems {
+		dueDate, err := time.Parse("2006-01-02", item.DueDate)
+		if err != nil {
+			dueDate = time.Time{} // 如果解析失败，使用零值
+		}
+		meeting.TodoItems[i] = models.TodoItem{
+			ID:          uuid.New().String(),
+			Description: item.Description,
+			Assignee:    item.Assignee,
+			DueDate:     dueDate,
+			Status:      item.Status,
 		}
 	}
 
-	// 转换决策
+	// 转换决策点
 	for i, decision := range request.Decisions {
-		meeting.Decisions[i] = services.Decision{
+		meeting.Decisions[i] = models.Decision{
+			ID:          uuid.New().String(),
 			Description: decision.Description,
+			MadeBy:      decision.MadeBy,
 		}
 	}
 
 	// 同步到Notion
-	notionPageID, err := h.notionService.SyncToNotion(meeting, "")
+	err = h.notionService.SyncMeeting(meeting)
 	if err != nil {
 		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{
 			"error": fmt.Sprintf("同步到Notion失败: %v", err),
@@ -348,7 +575,7 @@ func (h *Handler) SyncToNotion(c *fiber.Ctx) error {
 	}
 
 	return c.JSON(fiber.Map{
-		"message": "成功同步到Notion",
-		"page_id": notionPageID,
+		"status":       "success",
+		"notionPageId": meeting.NotionPageID,
 	})
 }

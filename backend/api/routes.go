@@ -26,5 +26,5 @@ func RegisterRoutes(app *fiber.App, handler *Handler) {
 
 	// 会议相关路由
 	api.Post("/meetings/analyze", handler.AnalyzeTranscript)
-	api.Post("/meetings/sync-notion", handler.SyncToNotion)
+	api.Post("/meetings/sync-notion", handler.SyncToNotionHandler)
 }

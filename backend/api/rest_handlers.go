@@ -6,19 +6,20 @@ import (
 	"net/http"
 	"time"
 
+	"meeting-mm/config"
 	"meeting-mm/models"
 	"meeting-mm/services"
 )
 
 // RestHandler 处理RESTful API请求
 type RestHandler struct {
-	syncNotionService func(title string, date time.Time, summary string, todos []string, decisions []string) error
+	notionService *services.NotionService
 }
 
 // NewRestHandler 创建一个新的RestHandler实例
-func NewRestHandler() *RestHandler {
+func NewRestHandler(cfg *config.Config) *RestHandler {
 	return &RestHandler{
-		syncNotionService: services.SyncToNotion,
+		notionService: services.NewNotionService(cfg),
 	}
 }
 
@@ -48,36 +49,8 @@ func (h *RestHandler) SyncMeetingToNotionHandler(w http.ResponseWriter, r *http.
 	meetingBytes, _ := json.Marshal(meeting)
 	fmt.Printf("接收到的会议数据: %s\n", string(meetingBytes))
 
-	// 获取会议日期，已经是time.Time类型
-	meetingDate := meeting.Date
-
-	// 如果日期为零值，使用当前日期
-	if meetingDate.IsZero() {
-		fmt.Printf("日期为零值，使用当前日期\n")
-		meetingDate = time.Now()
-	}
-
-	// 提取待办事项和决策点
-	var todos []string
-	var decisions []string
-
-	for _, todo := range meeting.TodoItems {
-		todos = append(todos, todo.Description)
-	}
-
-	for _, decision := range meeting.Decisions {
-		decisions = append(decisions, decision.Description)
-	}
-
 	// 调用同步函数
-	err := h.syncNotionService(
-		meeting.Title,
-		meetingDate,
-		meeting.Summary,
-		todos,
-		decisions,
-	)
-
+	err := h.notionService.SyncMeeting(&meeting)
 	if err != nil {
 		fmt.Printf("同步到Notion失败: %v\n", err)
 		respondWithError(w, http.StatusInternalServerError, fmt.Sprintf("同步到Notion失败: %v", err))
@@ -89,4 +62,3 @@ func (h *RestHandler) SyncMeetingToNotionHandler(w http.ResponseWriter, r *http.
 		"message": "会议纪要已成功同步到Notion",
 	})
 }
-
